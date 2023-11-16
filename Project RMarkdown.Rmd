@@ -1,0 +1,299 @@
+---
+title: "Untitled"
+author: "Mphaphuli M.P"
+date: "2023-11-13"
+output:
+  word_document: default
+  html_document: default
+---
+
+# Loading libraries
+```{r}
+library(geoR)
+library(gstat)
+library(fields)
+```
+
+# Observation Point + Observation region
+```{r}
+points(sic.100, borders = sic.borders, col = "darkblue")
+points(sic.367, borders = sic.borders, col = "lightblue", add = TRUE)
+legend("topright", legend = c("sic.100", "sic.367"), col = c("darkblue", "lightblue"), pch = 1)
+```
+```{r}
+plot.geodata(sic.100,bor=sic.borders)
+```
+
+```{r}
+vario.b<- variog(sic.100,option =c ("bin", "cloud", "smooth"),
+                 bin.cloud=TRUE)
+vario.c <- variog(sic.100, op="cloud")
+bplot.xy(vario.c$u,vario.c$v, breaks=vario.b$u,col="grey80",
+         lwd=2,cex=0.1,outline=FALSE)
+```
+# Experimental variogram
+```{r}
+vario.ex<- variog(sic.100, bin.cloud=TRUE)
+plot(vario.ex)
+```
+
+# Directional variograms
+```{r}
+vario4<-variog4(sic.100)
+plot(vario4,same=FALSE)
+plot(variog4(sic.100, trend = "2nd", max.dist = 309.75), omnidirectional = T)
+```
+
+# Three examples of experimental variogram adjustment
+```{r}
+vario.ex<- variog(sic.100,option="bin")
+vario.sphe<-(variofit(vario.ex,cov.model= "spher",
+                      ini.cov.pars=c(15000,200)))
+par(mfrow=c(2,2), mar=c(3,3,1,1), mgp =c (2,1,0))
+plot(vario.ex,main="Spherical")
+lines.variomodel(cov.model="sphe",cov.pars=c(15000,100),
+                 nug=0,max.dist=350)
+plot(vario.ex,main="Exponential")
+lines.variomodel(cov.model="exp",cov.pars=c(15000,100),
+                 nug=0,max.dist=350)
+plot(vario.ex,main="Exponential with nugget effect")
+lines.variomodel(cov.model="exp",cov.pars=c(10000,100),
+                 nug=5000,max.dist=350)
+plot(vario.ex,main="Exponential with nugget effect")
+lines.variomodel(cov.model="matern",cov.pars=c(10000,100),
+                 nug=0,max.dist=350,kappa=0.5)
+```
+
+# Spherical variogram for raw data
+```{r}
+vario.ex<- variog(sic.100, bin.cloud=TRUE)
+plot(vario.ex,main="")
+lines.variomodel(cov.model="spher",cov.pars=c(15000,50),
+                 nug=0,max.dist=300)
+# Extract parameters
+nugget <- vario.ex$nugget
+sill <- vario.ex$sill
+range_param <- vario.ex$range
+
+# Print the results
+cat("Nugget:", nugget, "/n")
+cat("Sill:", sill, "/n")
+cat("Range:", range_param, "/n")
+```
+
+# Kriging estimates and variance for raw data
+```{r}
+pred.grid <- expand.grid(seq(0,350, l=51),seq (0,220, l=51))
+rgb.palette <- colorRampPalette(c("darkblue", "blue", "purple", "yellow"),space = "rgb")
+kc<- krige.conv(sic.100, loc = pred.grid,
+                krige=krige.control(cov.model="spherical",cov.pars=c(15000,50)))
+image(kc, loc = pred.grid,col =rgb.palette(20) ,xlab="Coord X",
+      ylab="Coord Y",borders=sic.borders,main="Estimation")
+legend_colors <- rgb.palette(20)
+legend_breaks <- seq(min(kc$krige.var), max(kc$predict), length.out = length(legend_colors) + 1)
+image.plot(x = NULL, y = NULL, z = matrix(legend_breaks, nrow = 1), col = rgb.palette(20),
+           axes = FALSE, legend.only = TRUE, horizontal = FALSE, legend.width = 1, legend.shrink = 0.8,
+           legend.mar = 5)
+krige.var <- kc$krige.var
+image(kc, krige.var,loc = pred.grid,col=rgb.palette(20),
+      xlab="Coord X",ylab="Coord Y",borders=sic.borders,
+      main="Kriging variance")
+legend_colors <- rgb.palette(20)
+legend_breaks <- seq(min(kc$krige.var), max(kc$predict), length.out = length(legend_colors) + 1)
+image.plot(x = NULL, y = NULL, z = matrix(legend_breaks, nrow = 1), col = rgb.palette(20),
+           axes = FALSE, legend.only = TRUE, horizontal = FALSE, legend.width = 1, legend.shrink = 0.8,
+           legend.mar = 5)
+```
+
+# Estimated and observed values
+```{r}
+kc1<- krige.conv(sic.100, loc = sic.100$coords,
+                 krige=krige.control(cov.model="spherical",cov.pars=c(16000,47)))
+kc2<- krige.conv(sic.100, loc = sic.367$coords,
+                 krige=krige.control(cov.model="spherical",cov.pars=c(16000,47)))
+plot(sic.100$data,kc1$predict,xlab="Observed",ylab="Estimated",
+     main="Control sample")
+abline(a=0,b=1,col="red")
+plot(sic.367$data,kc2$predict,xlab="Observed",ylab="Estimated",
+     main="Control")
+abline(a=0,b=1,col="red")
+```
+
+# Transformation
+```{r}
+plot.geodata(sic.100,bor=sic.borders,lambda = 0.5)
+```
+
+# Experimental variogram and theoretical variogram after transformation
+```{r}
+vario.ext <- variog(sic.100, option= "bin",lambda = 0.5)
+plot(vario.ext)
+lines.variomodel(cov.m = "mat",cov.p = c(105,36), nug = 6.9,
+                 max.dist = 300, kappa = 1, lty = 1)
+vario.ext <- variog(sic.100, option= "bin",lambda = 0.5)
+plot(vario.ext)
+lines.variomodel(cov.m = "spherical",cov.p = c(105,36), nug = 6.9,
+                 max.dist = 300, kappa = 1, lty = 1)
+vario.ext <- variog(sic.100, option= "bin",lambda = 0.5)
+plot(vario.ext)
+lines.variomodel(cov.m = "gaussian",cov.p = c(105,36), nug = 6.9,
+                 max.dist = 300, kappa = 1, lty = 1)
+summary(vario.ext)
+
+# Extract parameters
+nugget <- vario.ext$nugget
+sill <- vario.ext$sill
+range_param <- vario.ext$range
+
+# Print the results
+cat("Nugget:", nugget, "/n")
+cat("Sill:", sill, "/n")
+cat("Range:", range_param, "/n")
+```
+
+# Kriging estimates and variance for transformed data
+```{r}
+pred.grid1 <- expand.grid(seq(0,350, l = 51), seq(0,220, l = 51))
+rgb.palette <- colorRampPalette(c("darkblue", "blue", "purple", "yellow"), space = "rgb")
+kct <- krige.conv(sic.100, loc = pred.grid1, krige = krige.control(cov.model = "matern", cov.pars = c(105, 36), kappa = 1, nugget = 6.9, lambda = 0.5))
+image(kct, loc = pred.grid, col = rgb.palette(20),
+      xlab = "Coord X", ylab = "Coord Y", borders = sic.borders,
+      main = "Estimation")
+legend_colors <- rgb.palette(20)
+legend_breaks <- seq(min(kct$krige.var), max(kct$predict), length.out = length(legend_colors) + 1)
+image.plot(x = NULL, y = NULL, z = matrix(legend_breaks, nrow = 1), col = rgb.palette(20),
+           axes = FALSE, legend.only = TRUE, horizontal = FALSE, legend.width = 1, legend.shrink = 0.8,
+           legend.mar = 5)
+krige.var1 <- kct$krige.var
+image(kct, krige.var1,loc = pred.grid1, col = rgb.palette(20),xlab = "Coord X", ylab = "Coord Y", borders = sic.borders,
+      main = "Kriging Variance")
+legend_colors <- rgb.palette(20)
+legend_breaks <- seq(min(kct$krige.var), max(kct$predict), length.out = length(legend_colors) + 1)
+image.plot(x = NULL, y = NULL, z = matrix(legend_breaks, nrow = 1), col = rgb.palette(20),
+           axes = FALSE, legend.only = TRUE, horizontal = FALSE, legend.width = 1, legend.shrink = 0.8,
+           legend.mar = 5)
+```
+
+# Estimated and observed values for transformed data
+```{r}
+kct1<- krige.conv(sic.100, loc = sic.100$coords,
+                  krige=krige.control(cov.model="spherical",cov.pars=c(16000,47),
+                                      kappa=1,nugget=6.9,lambda=0.5))
+kct2<- krige.conv(sic.100, loc = sic.367$coords,
+                  krige=krige.control(cov.model="spherical",cov.pars=c(16000,47),
+                                      kappa=1,nugget=6.9,lambda=0.5))
+plot(sic.100$data,kct1$predict,xlab="Observed",ylab="Estimated",
+     main="Sample")
+abline(a=0,b=1,col="red")
+plot(sic.367$data,kct2$predict,xlab="Observed",ylab="Estimated",
+     main="Control sample")
+abline(a=0,b=1,col="red")
+```
+
+
+#
+```{r}
+```
+
+# Cross Validation
+```{r}
+# Raw data
+res1 <- sic.100$data - kc1$predict
+res2 <- sic.367$data - kc2$predict
+
+
+## Calculate RMSE
+RMSE1 <- sqrt(mean(res1^2, na.rm =TRUE))
+RMSE2 <-sqrt(mean(res2^2, na.rm =TRUE))
+
+print(paste("RMSE for Control", RMSE1))
+print(paste("RMSE for Control Sample", RMSE2))
+
+## Calculate MAE
+mae <- mean(abs(res2))
+
+print(paste("MAE for Control Sample", mae))
+
+## Calculate R-squared
+mean_observed <- mean(sic.100$data)
+ss_total <- sum((sic.100$data - mean_observed)^2)
+ss_residual <- sum((res1)^2)
+r_squared <- 1 - (ss_residual / ss_total)
+
+print(paste("R-squared:", r_squared))
+
+## Calculate R-squared
+mean_observed1 <- mean(sic.367$data)
+ss_total1 <- sum((sic.367$data - mean_observed1)^2)
+ss_residual1 <- sum((res2)^2)
+r_squared1 <- 1 - (ss_residual1 / ss_total1)
+
+print(paste("R-squared:", r_squared1))
+
+# Transformed
+rest1 <- sic.100$data - kct1$predict
+rest2 <- sic.367$data- kct2$predict
+
+rmse_control <- sqrt(mean((sic.100$data - kct1$predict)^2))
+
+cat("RMSE for Control:", rmse_control, "/n")
+
+rmse_controlSample <- sqrt(mean((sic.367$data - kct2$predict)^2))
+
+cat("RMSE for Control Sample:", rmse_controlSample, "/n")
+ 
+## Calculate RMSE
+RMSE_1 <- sqrt(mean(rest1^2, na.rm =TRUE))
+RMSE_2 <- sqrt(mean(rest2^2, na.rm =TRUE))
+
+print(paste("RMSE for Control", RMSE_1))
+print(paste("RMSE for Control Sample", RMSE_2))
+
+## Calculate MAE
+mae_2 <- mean(abs(rest2))
+
+print(paste("MAE for Control Sample", mae_2))
+
+## Calculate R-squared
+mean_observed_t1 <- mean(sic.100$data)
+ss_total_t1 <- sum((sic.100$data - mean_observed_t1)^2)
+ss_residual_t1 <- sum((rest1)^2)
+r_squared_t1 <- 1 - (ss_residual_t1 / ss_total_t1)
+
+print(paste("R-squared:", r_squared_t1))
+
+## Calculate R-squared
+mean_observed_t2 <- mean(sic.100$data)
+ss_total_t2 <- sum((sic.100$data - mean_observed_t2)^2)
+ss_residual_t2 <- sum((rest2)^2)
+r_squared_t2 <- 1 - (ss_residual_t2 / ss_total_t2)
+
+print(paste("R-squared:", r_squared_t2))
+```
+# 
+```{r}
+# Extract observed values from 'sic.100'
+observed_values <- sic.100$data
+
+# Predict using the kriging model 'kct1'
+predicted_values <- predict(kct1, newdata = sic.100)
+
+# Specify lambda for Box-Cox transformation (replace with your actual lambda)
+lambda <- 0.5
+
+# Apply Box-Cox transformation to the observed values
+transformed_observed <- ifelse(lambda == 0, log(observed_values), (observed_values^lambda - 1) / lambda)
+
+# Apply Box-Cox transformation to the predicted values
+transformed_predicted <- ifelse(lambda == 0, log(kct1), (kct1^lambda - 1) / lambda)
+
+# Calculate residuals for the transformed values
+residuals_transformed <- transformed_observed - kct1
+
+```
+
+
+
+```{r}
+shapiro.test(sic.100$data) # Raw data
+```
